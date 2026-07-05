@@ -19,7 +19,7 @@ jobs:
           python-version: '3.10'
 
       - name: Install Graphify
-        run: pip install graphifyy
+        run: pip install "graphifyy[gemini]"
 
       - name: Generate Codebase Graph
         # Passing GEMINI_API_KEY from GitHub secrets for semantic extraction of doc files
