@@ -1,0 +1,49 @@
+name: Generate Codebase Graph
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Allows manual triggering from the GitHub Actions tab
+
+jobs:
+  generate-graph:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Graphify
+        run: pip install graphifyy
+
+      - name: Generate Codebase Graph
+        # Use --no-cluster for AST extraction without needing LLM API keys in the CI pipeline
+        run: graphify extract . --no-cluster
+
+      - name: Upload Graph to GitHub Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: codebase-graph
+          path: graphify-out/graph.json
+          retention-days: 14 # Store for 14 days
+
+      # =========================================================
+      # ALTERNATIVE: S3 Upload Approach (Commented out)
+      # =========================================================
+      # If you prefer to push this to an S3 bucket that POV3 reads from:
+      #
+      # - name: Configure AWS Credentials
+      #   uses: aws-actions/configure-aws-credentials@v4
+      #   with:
+      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     aws-region: us-east-1
+      #
+      # - name: Upload Graph to S3
+      #   run: |
+      #     aws s3 cp graphify-out/graph.json s3://${{ secrets.GRAPH_S3_BUCKET }}/demo-tpch-app/codebase_graph.json
