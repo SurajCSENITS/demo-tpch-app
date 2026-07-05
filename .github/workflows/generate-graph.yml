@@ -22,7 +22,9 @@ jobs:
         run: pip install graphifyy
 
       - name: Generate Codebase Graph
-        # Use --no-cluster for AST extraction without needing LLM API keys in the CI pipeline
+        # Passing GEMINI_API_KEY from GitHub secrets for semantic extraction of doc files
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: graphify extract . --no-cluster
 
       - name: Upload Graph to GitHub Artifacts
