@@ -248,13 +248,36 @@ def load_graph(graph_path: Path) -> dict:
     return {"nodes": [], "edges": [], "hyperedges": []}
 
 
-def inject_sql_nodes(graph: dict, new_nodes: list[dict]) -> dict:
+def inject_sql_nodes(graph: dict, new_nodes: list[dict], root: Path) -> dict:
     """
     Merge *new_nodes* into *graph*, deduplicating by ``id``.
     Existing ``sql_query`` nodes are removed first so re-runs are idempotent.
+
+    Additionally, any existing graphify file-level nodes whose ``source_file``
+    ends in ``.sql`` are enriched in-place with an ``extracted_sql`` field
+    containing the full raw content of that file.
     """
-    existing = [n for n in graph.get("nodes", []) if n.get("type") != "sql_query"]
-    graph["nodes"] = existing + new_nodes
+    enriched = []
+    for node in graph.get("nodes", []):
+        if node.get("type") == "sql_query":
+            # Drop stale sql_query nodes — they'll be re-added below.
+            continue
+        source_file = node.get("source_file") or node.get("file", "")
+        if source_file.endswith(".sql") and "extracted_sql" not in node:
+            # Graphify stores source_file relative to the repo root.
+            candidate = root / source_file
+            if candidate.exists():
+                try:
+                    node["extracted_sql"] = candidate.read_text(
+                        encoding="utf-8", errors="replace"
+                    ).strip()
+                    print(f"  ↳  enriched existing node '{node.get('id')}' "
+                          f"with extracted_sql from {source_file}")
+                except OSError as exc:
+                    print(f"  [WARN] Could not read {candidate}: {exc}",
+                          file=sys.stderr)
+        enriched.append(node)
+    graph["nodes"] = enriched + new_nodes
     return graph
 
 
@@ -318,7 +341,7 @@ def main() -> None:
     graph_path.parent.mkdir(parents=True, exist_ok=True)
 
     graph = load_graph(graph_path)
-    graph = inject_sql_nodes(graph, all_nodes)
+    graph = inject_sql_nodes(graph, all_nodes, root)
 
     with graph_path.open("w", encoding="utf-8") as f:
         json.dump(graph, f, indent=2)
