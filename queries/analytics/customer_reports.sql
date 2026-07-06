@@ -43,10 +43,7 @@ ORDER BY o_orderpriority;
 
 
 -- Query 4: Using SELECT * with a function on a column in WHERE (prevents pruning)
-SELECT *
-FROM MALL_CUSTOMERS
-WHERE CAST(AGE AS VARCHAR) LIKE '3%'
-ORDER BY TO_VARCHAR(ANNUAL_INCOME_K) || ' thousand';
+SELECT CUSTOMER_ID, AGE, ANNUAL_INCOME_K FROM MALL_CUSTOMERS WHERE AGE BETWEEN 30 AND 39 ORDER BY ANNUAL_INCOME_K;
 
 -- Query 5: Correlated subquery that re-scans the table for every row
 SELECT
