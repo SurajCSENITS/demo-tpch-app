@@ -27,6 +27,9 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: graphify extract . --no-cluster
 
+      - name: Extract and Inject SQL Query Nodes
+        run: python scripts/extract_sql_nodes.py
+
       - name: Upload Graph to GitHub Artifacts
         uses: actions/upload-artifact@v4
         with:
