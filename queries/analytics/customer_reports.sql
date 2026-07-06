@@ -37,3 +37,26 @@ FROM snowflake_sample_data.tpch_sf1.orders
 WHERE o_orderdate >= '1993-07-01' AND o_orderdate < '1993-10-01'
 GROUP BY o_orderpriority
 ORDER BY o_orderpriority;
+
+
+
+
+
+-- Query 4: Using SELECT * with a function on a column in WHERE (prevents pruning)
+SELECT *
+FROM MALL_CUSTOMERS
+WHERE CAST(AGE AS VARCHAR) LIKE '3%'
+ORDER BY TO_VARCHAR(ANNUAL_INCOME_K) || ' thousand';
+
+-- Query 5: Correlated subquery that re-scans the table for every row
+SELECT
+    CUSTOMER_ID,
+    GENRE,
+    AGE,
+    ANNUAL_INCOME_K,
+    SPENDING_SCORE,
+    (SELECT AVG(SPENDING_SCORE) FROM MALL_CUSTOMERS WHERE GENRE = m.GENRE) AS AVG_GENRE_SCORE,
+    (SELECT MAX(ANNUAL_INCOME_K) FROM MALL_CUSTOMERS WHERE AGE = m.AGE) AS MAX_INCOME_SAME_AGE,
+    (SELECT COUNT(*) FROM MALL_CUSTOMERS WHERE ANNUAL_INCOME_K > m.ANNUAL_INCOME_K) AS RANK_BY_INCOME
+FROM MALL_CUSTOMERS m
+ORDER BY RANK_BY_INCOME;
