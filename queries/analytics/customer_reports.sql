@@ -1,11 +1,5 @@
 -- Query 1: Minimum Cost Supplier
-SELECT s.s_acctbal, s.s_name, n.n_name, p.p_partkey, p.p_mfgr, s.s_address, s.s_phone, s.s_comment
-FROM snowflake_sample_data.tpch_sf1.part p
-JOIN snowflake_sample_data.tpch_sf1.partsupp ps ON p.p_partkey = ps.ps_partkey
-JOIN snowflake_sample_data.tpch_sf1.supplier s ON s.s_suppkey = ps.ps_suppkey
-JOIN snowflake_sample_data.tpch_sf1.nation n ON s.s_nationkey = n.n_nationkey
-JOIN snowflake_sample_data.tpch_sf1.region r ON n.n_regionkey = r.r_regionkey
-WHERE p.p_size = 15 AND p.p_type LIKE '%BRASS' AND r.r_name = 'EUROPE';
+SELECT s.s_acctbal, s.s_name, n.n_name, p.p_partkey, p.p_mfgr, s.s_address, s.s_phone, s.s_comment FROM snowflake_sample_data.tpch_sf1.part p JOIN snowflake_sample_data.tpch_sf1.partsupp ps ON p.p_partkey = ps.ps_partkey JOIN snowflake_sample_data.tpch_sf1.supplier s ON s.s_suppkey = ps.ps_suppkey JOIN snowflake_sample_data.tpch_sf1.nation n ON s.s_nationkey = n.n_nationkey JOIN snowflake_sample_data.tpch_sf1.region r ON n.n_regionkey = r.r_regionkey WHERE p.p_size = 15 AND p.p_type LIKE '%BRASS' AND r.r_name = 'EUROPE';
 
 -- Query 2: Shipping Priority Query (Target for optimization, implicit cross-joins)
 SELECT
