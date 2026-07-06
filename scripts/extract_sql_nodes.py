@@ -253,18 +253,28 @@ def inject_sql_nodes(graph: dict, new_nodes: list[dict], root: Path) -> dict:
     Merge *new_nodes* into *graph*, deduplicating by ``id``.
     Existing ``sql_query`` nodes are removed first so re-runs are idempotent.
 
-    Additionally, any existing graphify file-level nodes whose ``source_file``
-    ends in ``.sql`` are enriched in-place with an ``extracted_sql`` field
-    containing the full raw content of that file.
+    For file-level graphify nodes whose ``source_file`` ends in ``.sql``:
+    - If no per-query ``sql_query`` nodes were extracted for that file (e.g. a
+      migration stub with only comments), the full raw file content is backfilled
+      as ``extracted_sql`` so the agent still has something to read.
+    - If per-query nodes DO exist for that file, the file-level node is left
+      as-is to avoid redundant duplication of the same SQL content.
     """
+    # Build the set of files that already have dedicated per-query nodes.
+    files_with_query_nodes: set[str] = {
+        n["file"] for n in new_nodes if n.get("type") == "sql_query"
+    }
+
     enriched = []
     for node in graph.get("nodes", []):
         if node.get("type") == "sql_query":
             # Drop stale sql_query nodes — they'll be re-added below.
             continue
         source_file = node.get("source_file") or node.get("file", "")
-        if source_file.endswith(".sql") and "extracted_sql" not in node:
-            # Graphify stores source_file relative to the repo root.
+        if (source_file.endswith(".sql")
+                and "extracted_sql" not in node
+                and source_file not in files_with_query_nodes):
+            # Only enrich when there are no per-query nodes for this file.
             candidate = root / source_file
             if candidate.exists():
                 try:
@@ -272,7 +282,8 @@ def inject_sql_nodes(graph: dict, new_nodes: list[dict], root: Path) -> dict:
                         encoding="utf-8", errors="replace"
                     ).strip()
                     print(f"  ↳  enriched existing node '{node.get('id')}' "
-                          f"with extracted_sql from {source_file}")
+                          f"with extracted_sql from {source_file} "
+                          f"(no per-query nodes for this file)")
                 except OSError as exc:
                     print(f"  [WARN] Could not read {candidate}: {exc}",
                           file=sys.stderr)
