@@ -27,6 +27,9 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: graphify extract . --no-cluster
 
+      - name: Install Script Dependencies
+        run: pip install -r requirements.txt
+
       - name: Extract and Inject SQL Query Nodes
         run: python scripts/extract_sql_nodes.py
 

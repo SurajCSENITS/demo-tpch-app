@@ -16,12 +16,15 @@ Defaults:
 
 import ast
 import argparse
+import hashlib
 import json
 import os
 import re
 import sys
 from pathlib import Path
 from typing import Optional
+
+import sqlglot
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -37,6 +40,34 @@ SQL_SEPARATOR_RE = re.compile(r"^\s*--\s*Query\s+\d+", re.IGNORECASE)
 # Directories to skip entirely
 SKIP_DIRS = {".git", ".github", "__pycache__", "graphify-out", ".venv", "venv",
              "node_modules", ".mypy_cache", ".pytest_cache"}
+
+
+# ---------------------------------------------------------------------------
+# AST Fingerprinting
+# ---------------------------------------------------------------------------
+
+def get_ast_fingerprint(sql: str) -> str:
+    """
+    Compute a stable, dialect-normalised SHA-256 fingerprint for *sql*.
+
+    Parsing is done with sqlglot using the Snowflake dialect so that trivial
+    formatting differences (extra whitespace, alias capitalisation, etc.) do
+    not produce different hashes.
+
+    Fallback: if sqlglot cannot parse the statement for any reason, the raw
+    text is stripped, lower-cased, and its whitespace collapsed before hashing
+    so that a fingerprint is always returned.
+    """
+    try:
+        tree = sqlglot.parse_one(
+            sql, read="snowflake",
+            error_level=sqlglot.ErrorLevel.IGNORE,
+        )
+        canonical_sql = tree.sql(dialect="snowflake", pretty=False)
+        return hashlib.sha256(canonical_sql.encode("utf-8")).hexdigest()
+    except Exception:
+        fallback = " ".join(sql.strip().lower().split())
+        return hashlib.sha256(fallback.encode("utf-8")).hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -107,13 +138,15 @@ def extract_from_python(filepath: Path, rel_path: str) -> list[dict]:
         line_start = value.lineno
         line_end = value.end_lineno if value.end_lineno else line_start
 
+        sql_stripped = sql_text.strip()
         nodes.append({
             "id": make_id(slug, counter),
             "type": "sql_query",
             "file": rel_path,
             "line_start": line_start,
             "line_end": line_end,
-            "extracted_sql": sql_text.strip(),
+            "extracted_sql": sql_stripped,
+            "ast_fingerprint": get_ast_fingerprint(sql_stripped),
         })
         counter += 1
 
@@ -205,6 +238,7 @@ def extract_from_sql(filepath: Path, rel_path: str) -> list[dict]:
             "line_start": line_start,
             "line_end": line_end,
             "extracted_sql": text,
+            "ast_fingerprint": get_ast_fingerprint(text),
         })
 
     return nodes
@@ -278,11 +312,13 @@ def inject_sql_nodes(graph: dict, new_nodes: list[dict], root: Path) -> dict:
             candidate = root / source_file
             if candidate.exists():
                 try:
-                    node["extracted_sql"] = candidate.read_text(
+                    raw_sql = candidate.read_text(
                         encoding="utf-8", errors="replace"
                     ).strip()
+                    node["extracted_sql"] = raw_sql
+                    node["ast_fingerprint"] = get_ast_fingerprint(raw_sql)
                     print(f"  ↳  enriched existing node '{node.get('id')}' "
-                          f"with extracted_sql from {source_file} "
+                          f"with extracted_sql + ast_fingerprint from {source_file} "
                           f"(no per-query nodes for this file)")
                 except OSError as exc:
                     print(f"  [WARN] Could not read {candidate}: {exc}",
