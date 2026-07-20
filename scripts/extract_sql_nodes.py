@@ -324,7 +324,34 @@ def inject_sql_nodes(graph: dict, new_nodes: list[dict], root: Path) -> dict:
                     print(f"  [WARN] Could not read {candidate}: {exc}",
                           file=sys.stderr)
         enriched.append(node)
+        
     graph["nodes"] = enriched + new_nodes
+
+    # Generate edges linking the new sql_query nodes back to their source file nodes
+    new_edges = []
+    new_node_ids = set()
+    for node in new_nodes:
+        if node.get("type") == "sql_query":
+            new_node_ids.add(node["id"])
+            parent_id = slugify(node["file"])
+            new_edges.append({
+                "source": parent_id,
+                "target": node["id"],
+                "relation": "contains_query",
+                "confidence": "EXTRACTED",
+                "confidence_score": 1,
+                "source_file": node["file"]
+            })
+
+    # Filter out existing edges that pointed to the stale sql_query nodes
+    existing_edges = []
+    for edge in graph.get("edges", []):
+        target = edge.get("target")
+        # Keep the edge if it doesn't target a newly added query node or a previously dropped one
+        if target not in dropped_node_ids and target not in new_node_ids:
+            existing_edges.append(edge)
+
+    graph["edges"] = existing_edges + new_edges
     return graph
 
 
