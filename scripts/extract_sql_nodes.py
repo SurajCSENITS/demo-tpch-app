@@ -300,9 +300,11 @@ def inject_sql_nodes(graph: dict, new_nodes: list[dict], root: Path) -> dict:
     }
 
     enriched = []
+    dropped_node_ids = set()
     for node in graph.get("nodes", []):
         if node.get("type") == "sql_query":
             # Drop stale sql_query nodes — they'll be re-added below.
+            dropped_node_ids.add(node.get("id"))
             continue
         source_file = node.get("source_file") or node.get("file", "")
         if (source_file.endswith(".sql")
